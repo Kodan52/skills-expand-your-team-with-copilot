@@ -690,8 +690,8 @@ footer {
 }
 
 body[data-theme="dark"] .activity-tag {
-  background: #283593;
-  color: #e8eaf6;
+  background: var(--primary-dark);
+  color: var(--primary-text);
 }
 
 body[data-theme="dark"] input {
