@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let searchQuery = "";
   let currentDay = "";
   let currentTimeRange = "";
+  let highlightedActivity = "";
 
   // Authentication state
   let currentUser = null;
@@ -63,6 +64,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const activeTimeFilter = document.querySelector(".time-filter.active");
     if (activeTimeFilter) {
       currentTimeRange = activeTimeFilter.dataset.time;
+    }
+
+    const sharedActivity = new URLSearchParams(window.location.search).get(
+      "activity"
+    );
+    if (sharedActivity) {
+      searchQuery = sharedActivity;
+      highlightedActivity = sharedActivity;
+      searchInput.value = sharedActivity;
     }
   }
 
@@ -470,12 +480,24 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.entries(filteredActivities).forEach(([name, details]) => {
       renderActivityCard(name, details);
     });
+
+    if (highlightedActivity && filteredActivities[highlightedActivity]) {
+      const highlightedCard = document.querySelector(
+        `[data-activity-card="${CSS.escape(highlightedActivity)}"]`
+      );
+      highlightedCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
 
   // Function to render a single activity card
   function renderActivityCard(name, details) {
     const activityCard = document.createElement("div");
     activityCard.className = "activity-card";
+    activityCard.dataset.activityCard = name;
+
+    if (name === highlightedActivity) {
+      activityCard.classList.add("shared-activity-highlight");
+    }
 
     // Calculate spots and capacity
     const totalSpots = details.max_participants;
@@ -498,6 +520,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Format the schedule using the new helper function
     const formattedSchedule = formatSchedule(details);
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set("activity", name);
+    const shareMessage = `Check out ${name} at Mergington High School. ${formattedSchedule}`;
+    const emailShareLink = `mailto:?subject=${encodeURIComponent(
+      `Check out ${name}`
+    )}&body=${encodeURIComponent(`${shareMessage}\n\n${shareUrl.toString()}`)}`;
 
     // Create activity tag
     const tagHtml = `
@@ -569,6 +597,17 @@ document.addEventListener("DOMContentLoaded", () => {
         `
         }
       </div>
+      <div class="share-actions" aria-label="Share ${name}">
+        <button class="share-button" data-activity="${name}" data-share-url="${shareUrl.toString()}" data-share-message="${shareMessage}">
+          Share
+        </button>
+        <button class="copy-share-button" data-share-url="${shareUrl.toString()}">
+          Copy Link
+        </button>
+        <a class="share-link-button" href="${emailShareLink}">
+          Email
+        </a>
+      </div>
     `;
 
     // Add click handlers for delete buttons
@@ -587,7 +626,65 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    const shareButton = activityCard.querySelector(".share-button");
+    const copyShareButton = activityCard.querySelector(".copy-share-button");
+
+    shareButton.addEventListener("click", handleShareActivity);
+    copyShareButton.addEventListener("click", handleCopyShareLink);
+
     activitiesList.appendChild(activityCard);
+  }
+
+  async function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const tempInput = document.createElement("textarea");
+    tempInput.value = text;
+    tempInput.setAttribute("readonly", "");
+    tempInput.style.position = "absolute";
+    tempInput.style.left = "-9999px";
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand("copy");
+    document.body.removeChild(tempInput);
+  }
+
+  async function handleShareActivity(event) {
+    const { shareUrl, shareMessage, activity } = event.currentTarget.dataset;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: activity,
+          text: shareMessage,
+          url: shareUrl,
+        });
+        return;
+      }
+
+      await copyTextToClipboard(shareUrl);
+      showMessage("Share link copied to clipboard.", "success");
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        showMessage("Unable to share this activity right now.", "error");
+        console.error("Error sharing activity:", error);
+      }
+    }
+  }
+
+  async function handleCopyShareLink(event) {
+    const { shareUrl } = event.currentTarget.dataset;
+
+    try {
+      await copyTextToClipboard(shareUrl);
+      showMessage("Share link copied to clipboard.", "success");
+    } catch (error) {
+      showMessage("Unable to copy the share link right now.", "error");
+      console.error("Error copying share link:", error);
+    }
   }
 
   // Event listeners for search and filter
