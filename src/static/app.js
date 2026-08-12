@@ -482,11 +482,27 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (highlightedActivity && filteredActivities[highlightedActivity]) {
-      const highlightedCard = document.querySelector(
-        `[data-activity-card="${CSS.escape(highlightedActivity)}"]`
+      const highlightedCard = Array.from(
+        document.querySelectorAll("[data-activity-card]")
+      ).find(
+        (card) => card.dataset.activityCard === highlightedActivity
       );
       highlightedCard?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  }
+
+  function getActivityShareDetails(activityName, details) {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set("activity", activityName);
+    const shareMessage = `Check out ${activityName} at Mergington High School. ${formatSchedule(
+      details
+    )}`;
+
+    return {
+      activity: activityName,
+      shareUrl: shareUrl.toString(),
+      shareMessage,
+    };
   }
 
   // Function to render a single activity card
@@ -520,9 +536,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Format the schedule using the new helper function
     const formattedSchedule = formatSchedule(details);
-    const shareUrl = new URL(window.location.href);
-    shareUrl.searchParams.set("activity", name);
-    const shareMessage = `Check out ${name} at Mergington High School. ${formattedSchedule}`;
+    const { shareUrl, shareMessage } = getActivityShareDetails(name, details);
     const emailShareLink = `mailto:?subject=${encodeURIComponent(
       `Check out ${name}`
     )}&body=${encodeURIComponent(`${shareMessage}\n\n${shareUrl.toString()}`)}`;
@@ -598,10 +612,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       </div>
       <div class="share-actions" aria-label="Share ${name}">
-        <button class="share-button" data-activity="${name}" data-share-url="${shareUrl.toString()}" data-share-message="${shareMessage}">
+        <button class="share-button" data-activity="${name}">
           Share
         </button>
-        <button class="copy-share-button" data-share-url="${shareUrl.toString()}">
+        <button class="copy-share-button" data-activity="${name}">
           Copy Link
         </button>
         <a class="share-link-button" href="${emailShareLink}">
@@ -653,7 +667,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function handleShareActivity(event) {
-    const { shareUrl, shareMessage, activity } = event.currentTarget.dataset;
+    const { activity } = event.currentTarget.dataset;
+    const { shareUrl, shareMessage } = getActivityShareDetails(
+      activity,
+      allActivities[activity]
+    );
 
     try {
       if (navigator.share) {
@@ -676,7 +694,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function handleCopyShareLink(event) {
-    const { shareUrl } = event.currentTarget.dataset;
+    const { activity } = event.currentTarget.dataset;
+    const { shareUrl } = getActivityShareDetails(activity, allActivities[activity]);
 
     try {
       await copyTextToClipboard(shareUrl);
